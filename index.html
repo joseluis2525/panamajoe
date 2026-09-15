@@ -107,61 +107,53 @@
         </div>
     </div>
 
-    <script src="jsspeccy/jsspeccy.js"></script>
-
-        <script>
+       <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
 
+            // ¡AQUÍ ESTABA EL PROBLEMA! Faltaba el autoLoadTapes para que escriba LOAD ""
             const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
                 autoStart: true,
+                autoLoadTapes: true, // <- Esto es vital
                 sandbox: false,
                 machine: 48,
                 zoom: 1
             });
 
             function loadROM() {
-                statusEl.textContent = 'Descargando juego desde el servidor...';
+                statusEl.textContent = 'Insertando casete virtual...';
                 const absoluteURL = 'https://joseluis2525.github.io/panamajoe/panamajoe.tap';
                 
                 fetch(absoluteURL)
                     .then(response => {
-                        if (!response.ok) throw new Error("HTTP " + response.status);
-                        return response.blob();
+                        if (!response.ok) throw new Error("Error HTTP " + response.status);
+                        return response.arrayBuffer(); // Lo pasamos a binario puro
                     })
-                    .then(blob => {
-                        // Creamos el archivo virtual
-                        const file = new File([blob], "panamajoe.tap", { type: "application/octet-stream" });
+                    .then(buffer => {
+                        const u8 = new Uint8Array(buffer);
                         
-                        // INTENTO 1: Buscar el comando real de tu versión de JSSpeccy
-                        if (typeof speccy.loadFile === 'function') { speccy.loadFile(file); }
-                        else if (typeof speccy.load === 'function') { speccy.load(file); }
-                        else if (typeof speccy.openFile === 'function') { speccy.openFile(file); }
-                        else if (typeof speccy.loadTape === 'function') { speccy.loadTape(file); }
-                        else if (speccy.machine && typeof speccy.machine.loadFile === 'function') { speccy.machine.loadFile(file); }
+                        // Probamos los métodos binarios reales de JSSpeccy
+                        if (typeof speccy.loadTape === 'function') speccy.loadTape(u8);
+                        else if (typeof speccy.load === 'function') speccy.load(u8);
+                        else if (typeof speccy.loadFile === 'function') speccy.loadFile(u8);
+                        else if (speccy.machine && typeof speccy.machine.loadTape === 'function') speccy.machine.loadTape(u8);
                         else {
-                            // INTENTO 2 (EL TRUCO MAESTRO): Simular "Arrastrar y Soltar"
-                            const dt = new DataTransfer();
-                            dt.items.add(file);
-                            const dropEvent = new DragEvent('drop', { 
-                                bubbles: true, cancelable: true, dataTransfer: dt 
-                            });
-                            document.getElementById('jsspeccy').dispatchEvent(dropEvent);
-                            // También lo intentamos directo en el canvas por si acaso
-                            const canvas = document.querySelector('#jsspeccy canvas');
-                            if(canvas) canvas.dispatchEvent(dropEvent);
+                            // Truco Drag&Drop por si acaso
+                            const file = new File([u8], "panamajoe.tap");
+                            const dt = new DataTransfer(); dt.items.add(file);
+                            document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
                         }
                         
-                        statusEl.textContent = '¡Juego Cargado! Toca START para el menú.';
+                        statusEl.textContent = '¡Cinta reproduciendo! Verás los colores clásicos...';
                     })
                     .catch(err => {
                         console.error(err);
-                        statusEl.textContent = '❌ Error técnico: ' + err.message;
+                        statusEl.textContent = '❌ Error: ' + err.message;
                     });
             }
 
-            // Damos 1.5 segundos al emulador para despertar
-            setTimeout(loadROM, 1500);
+            // Le damos 1 segundo al emulador para despertar antes de meter la cinta
+            setTimeout(loadROM, 1000);
 
             // Controles táctiles
             const keyMap = { 'q':'q', 'a':'a', 'o':'o', 'p':'p', 'Space':' ', 'Enter':'Enter' };
@@ -193,7 +185,6 @@
                 });
             });
 
-            // Evitar menú contextual
             window.addEventListener('contextmenu', e => e.preventDefault());
         });
     </script>
