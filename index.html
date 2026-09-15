@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Configuración estricta para evitar zoom en móviles Android -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Panama Joe - Android Web</title>
     <style>
@@ -12,7 +11,7 @@
             background: #000; color: #fff;
             display: flex; flex-direction: column;
             align-items: center; justify-content: flex-start;
-            height: 100vh; overflow: hidden; touch-action: none; /* Evita scroll en móvil */
+            height: 100vh; overflow: hidden; touch-action: none; 
         }
         
         #game-header {
@@ -23,7 +22,6 @@
         #game-header h1 { font-size: 1.2em; color: #f0c040; margin: 0; }
         #status { font-size: 0.8em; color: #aaa; margin-top: 5px; }
 
-        /* Contenedor del emulador adaptado para pantalla */
         #emulator-container {
             width: 100%; max-width: 600px;
             flex-grow: 1; display: flex;
@@ -41,7 +39,6 @@
             image-rendering: pixelated;
         }
 
-        /* ----- CONTROLES TÁCTILES PARA ANDROID ----- */
         #gamepad {
             width: 100%; max-width: 600px; height: 160px;
             background: #1a1a2e; border-top: 2px solid #333;
@@ -65,13 +62,11 @@
         
         .btn:active, .btn.active { background: #f0c040; color: #000; border-color: #fff; }
 
-        /* Posiciones del D-PAD */
         #btn-up { grid-column: 2; grid-row: 1; }
         #btn-left { grid-column: 1; grid-row: 2; }
         #btn-down { grid-column: 2; grid-row: 2; }
         #btn-right { grid-column: 3; grid-row: 2; }
 
-        /* Botón de Acción / Salto */
         .action-buttons { display: flex; gap: 15px; }
         .btn-action {
             width: 70px; height: 70px; border-radius: 50%;
@@ -80,7 +75,6 @@
         }
         .btn-action:active, .btn-action.active { background: #f0c040; }
 
-        /* Para pantallas muy altas (ej: móviles modernos) */
         @media (min-height: 700px) {
             #gamepad { height: 200px; padding: 20px 30px; }
             .d-pad { grid-template-columns: 70px 70px 70px; grid-template-rows: 70px 70px; }
@@ -108,20 +102,17 @@
             <div id="btn-right" class="btn" data-key="p">→</div>
         </div>
         <div class="action-buttons">
-            <!-- Espacio para saltar, Enter para iniciar el juego en el menú -->
             <div id="btn-enter" class="btn btn-action" data-key="Enter">START</div>
             <div id="btn-jump" class="btn btn-action" data-key="Space">SALTAR</div>
         </div>
     </div>
 
-    <!-- Librería JSSpeccy -->
     <script src="jsspeccy/jsspeccy.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
 
-            // 1. Inicializar Emulador
             const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
                 autoStart: true,
                 sandbox: false,
@@ -129,71 +120,55 @@
                 zoom: 1
             });
 
-            // 2. AUTO-CARGAR LA ROM DESDE EL SERVIDOR (GitHub/Vercel)
             function loadROM() {
-                statusEl.textContent = 'Descargando juego...';
+                statusEl.textContent = 'Descargando juego desde el servidor...';
                 
-                // Hace una petición fetch al archivo .tap alojado junto al index.html
-                fetch('panamajoe.tap')
+                // ¡AQUÍ ESTÁ LA MAGIA! Ponemos tu ruta absoluta para que nunca se pierda.
+                const absoluteURL = 'https://joseluis2525.github.io/panamajoe/panamajoe.tap';
+                
+                fetch(absoluteURL)
                     .then(response => {
-                        if (!response.ok) throw new Error("ROM no encontrada");
+                        if (!response.ok) throw new Error("HTTP " + response.status);
                         return response.blob();
                     })
                     .then(blob => {
-                        // Engañamos a JSSpeccy simulando que subimos un archivo manualmente
                         const file = new File([blob], "panamajoe.tap");
                         speccy.openTAPFile(file);
                         statusEl.textContent = '¡Juego Cargado! Usa START (Menú) y SALTAR.';
                     })
                     .catch(err => {
                         console.error(err);
-                        statusEl.textContent = '❌ Error: Asegúrate de que panamajoe.tap esté en la carpeta.';
+                        // Ahora mostrará el error TÉCNICO exacto si vuelve a fallar
+                        statusEl.textContent = '❌ Error técnico: ' + err.message;
                     });
             }
 
-            // Damos 1 segundo para que JSSpeccy cargue su canvas, y luego cargamos la ROM
-            setTimeout(loadROM, 1000);
+            // Damos 1.5 segundos al emulador para despertar antes de inyectarle la ROM
+            setTimeout(loadROM, 1500);
 
-            // 3. CONTROLES TÁCTILES MULTI-TOUCH
-            const canvasSelector = '#jsspeccy canvas';
-            
-            // Mapa de teclas (Configuración por defecto de teclado de ZX Spectrum)
-            const keyMap = {
-                'q': 'q',         // Arriba
-                'a': 'a',         // Abajo
-                'o': 'o',         // Izquierda
-                'p': 'p',         // Derecha
-                'Space': ' ',     // Salto / Fuego
-                'Enter': 'Enter'  // Iniciar menú
-            };
+            // Controles táctiles
+            const keyMap = { 'q':'q', 'a':'a', 'o':'o', 'p':'p', 'Space':' ', 'Enter':'Enter' };
 
             function sendKeyEvent(key, type) {
-                const canvas = document.querySelector(canvasSelector);
+                const canvas = document.querySelector('#jsspeccy canvas');
                 if (!canvas) return;
                 const actualKey = keyMap[key] || key;
                 const event = new KeyboardEvent(type, { key: actualKey, bubbles: true, cancelable: true });
                 canvas.dispatchEvent(event);
             }
 
-            // Añadir eventos a todos los botones táctiles
             document.querySelectorAll('.btn').forEach(btn => {
                 const key = btn.getAttribute('data-key');
-
-                // Al tocar la pantalla (Presionar tecla)
                 btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); // Evita el zoom/scroll nativo de Android
+                    e.preventDefault();
                     btn.classList.add('active');
                     sendKeyEvent(key, 'keydown');
                 });
-
-                // Al soltar la pantalla (Soltar tecla)
                 btn.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     btn.classList.remove('active');
                     sendKeyEvent(key, 'keyup');
                 });
-                
-                // Fallback por si el dedo sale del botón
                 btn.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
                     btn.classList.remove('active');
@@ -201,7 +176,6 @@
                 });
             });
 
-            // Evitar menú contextual en el juego prolongado (Click derecho táctil)
             window.addEventListener('contextmenu', e => e.preventDefault());
         });
     </script>
