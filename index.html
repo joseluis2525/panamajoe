@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panama Joe - Android Web</title>
+    <title>Panama Joe - Android</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -31,7 +31,8 @@
         
         #jsspeccy {
             width: 100%; aspect-ratio: 4 / 3;
-            background: #111; image-rendering: pixelated;
+            background: #111; border: 1px solid #333;
+            image-rendering: pixelated;
         }
         
         #jsspeccy canvas {
@@ -86,7 +87,7 @@
 
     <div id="game-header">
         <h1>Panama Joe</h1>
-        <div id="status">Iniciando emulador...</div>
+        <div id="status">Iniciando sistema...</div>
     </div>
 
     <div id="emulator-container">
@@ -107,55 +108,59 @@
         </div>
     </div>
 
-       <script>
+    <!-- 1. LIBRERÍA DEL EMULADOR (Vital que no se borre) -->
+    <script src="jsspeccy/jsspeccy.js"></script>
+
+    <!-- 2. LÓGICA DEL JUEGO -->
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
 
-            // ¡AQUÍ ESTABA EL PROBLEMA! Faltaba el autoLoadTapes para que escriba LOAD ""
+            // Configuramos el emulador
             const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
                 autoStart: true,
-                autoLoadTapes: true, // <- Esto es vital
+                autoLoadTapes: true, // Esto obliga al emulador a escribir LOAD ""
                 sandbox: false,
                 machine: 48,
                 zoom: 1
             });
 
+            // Función para descargar e inyectar el casete
             function loadROM() {
-                statusEl.textContent = 'Insertando casete virtual...';
+                statusEl.textContent = 'Descargando casete virtual...';
                 const absoluteURL = 'https://joseluis2525.github.io/panamajoe/panamajoe.tap';
                 
                 fetch(absoluteURL)
                     .then(response => {
-                        if (!response.ok) throw new Error("Error HTTP " + response.status);
-                        return response.arrayBuffer(); // Lo pasamos a binario puro
+                        if (!response.ok) throw new Error("Error de conexión");
+                        return response.blob();
                     })
-                    .then(buffer => {
-                        const u8 = new Uint8Array(buffer);
+                    .then(blob => {
+                        // Creamos el archivo para el emulador
+                        const file = new File([blob], "panamajoe.tap");
                         
-                        // Probamos los métodos binarios reales de JSSpeccy
-                        if (typeof speccy.loadTape === 'function') speccy.loadTape(u8);
-                        else if (typeof speccy.load === 'function') speccy.load(u8);
-                        else if (typeof speccy.loadFile === 'function') speccy.loadFile(u8);
-                        else if (speccy.machine && typeof speccy.machine.loadTape === 'function') speccy.machine.loadTape(u8);
-                        else {
-                            // Truco Drag&Drop por si acaso
-                            const file = new File([u8], "panamajoe.tap");
-                            const dt = new DataTransfer(); dt.items.add(file);
+                        // Usamos la función exacta que tenías en tu código original
+                        if (typeof speccy.openTAPFile === 'function') {
+                            speccy.openTAPFile(file);
+                        } else {
+                            // Fallback de seguridad
+                            const dt = new DataTransfer();
+                            dt.items.add(file);
                             document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
                         }
                         
-                        statusEl.textContent = '¡Cinta reproduciendo! Verás los colores clásicos...';
+                        statusEl.textContent = '¡Cinta reproduciendo! Verás los colores en breve...';
                     })
                     .catch(err => {
                         console.error(err);
-                        statusEl.textContent = '❌ Error: ' + err.message;
+                        statusEl.textContent = '❌ Error al cargar: ' + err.message;
                     });
             }
 
-            // Le damos 1 segundo al emulador para despertar antes de meter la cinta
-            setTimeout(loadROM, 1000);
+            // Damos 2 segundos para asegurar que JSSpeccy está 100% encendido antes de meter la cinta
+            setTimeout(loadROM, 2000);
 
-            // Controles táctiles
+            // Sistema de controles táctiles
             const keyMap = { 'q':'q', 'a':'a', 'o':'o', 'p':'p', 'Space':' ', 'Enter':'Enter' };
 
             function sendKeyEvent(key, type) {
@@ -185,6 +190,7 @@
                 });
             });
 
+            // Evitar que la pantalla se seleccione al jugar rápido
             window.addEventListener('contextmenu', e => e.preventDefault());
         });
     </script>
