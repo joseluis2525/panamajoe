@@ -16,7 +16,6 @@
         #game-header h1 { font-size: 1.1em; color: #f0c040; margin: 0; }
         #status { font-size: 0.8em; color: #aaa; margin: 5px 0; }
 
-        /* Botón de carga manual integrado elegante */
         .upload-btn {
             display: inline-block; background: #333; border: 1px solid #f0c040;
             padding: 5px 15px; border-radius: 5px; font-size: 0.8em; color: #f0c040; margin-bottom: 5px;
@@ -26,19 +25,17 @@
 
         #emulator-container {
             width: 100%; max-width: 600px; background: #000; padding: 2px;
-            margin-bottom: 5px; /* Esto pega los controles al visor */
+            margin-bottom: 5px; 
         }
         
         #jsspeccy { width: 100%; aspect-ratio: 4/3; border: 2px solid #333; }
         #jsspeccy canvas { width: 100% !important; height: 100% !important; image-rendering: pixelated; outline: none; }
 
-        /* ZONA DE CONTROLES PEgada al visor */
         #gamepad-area {
             width: 100%; max-width: 600px; background: #1a1a2e;
             border-radius: 8px; padding: 10px; border: 1px solid #333;
         }
 
-        /* Botones de menú ahora del 1 al 5 y Enter */
         .menu-keys { 
             display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; 
             margin-bottom: 15px; 
@@ -71,7 +68,6 @@
         <h1>Panama Joe</h1>
         <div id="status">Iniciando emulador...</div>
         
-        <!-- EL BOTÓN MANUAL QUE PEDISTE -->
         <label for="manual-load" class="upload-btn">📂 Cargar ROM manual (.tap)</label>
         <input type="file" id="manual-load" accept=".tap">
     </div>
@@ -81,7 +77,6 @@
     </div>
 
     <div id="gamepad-area">
-        <!-- BOTONES DE MENÚ PARA SELECCIONAR TECLADO O DEFINIR TECLAS -->
         <div class="menu-keys">
             <div class="btn" data-key="1">1</div>
             <div class="btn" data-key="2">2</div>
@@ -91,7 +86,6 @@
             <div class="btn" data-key="Enter">ENT</div>
         </div>
 
-        <!-- CONTROLES DE JUEGO (D-PAD) -->
         <div class="game-controls">
             <div class="d-pad">
                 <div id="btn-up" class="btn" data-key="q">↑</div>
@@ -103,10 +97,121 @@
         </div>
     </div>
 
-    <!-- LIBRERÍA ORIGINAL DEL EMULADOR -->
     <script src="jsspeccy/jsspeccy.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
-            
+            const manualLoadInput = document.getElementById('manual-load');
+
+            const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
+                autoStart: true,
+                autoLoadTapes: true,
+                sandbox: false,
+                machine: 48,
+                zoom: 1
+            });
+
+            // Función todoterreno para inyectar el archivo (Auto o Manual)
+            function forceLoadFile(file) {
+                if (typeof speccy.openTAPFile === 'function') {
+                    try { speccy.openTAPFile(file); return; } catch(e){}
+                }
+                // Si la función falla, usamos el truco de arrastrar y soltar
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                const dropEvent = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
+                
+                document.getElementById('jsspeccy').dispatchEvent(dropEvent);
+                const canvas = document.querySelector('#jsspeccy canvas');
+                if(canvas) canvas.dispatchEvent(dropEvent);
+            }
+
+            // 1. CARGA AUTOMÁTICA
+            function autoLoadROM() {
+                statusEl.textContent = 'Intentando auto-cargar el juego...';
+                fetch('panamajoe.tap')
+                    .then(r => {
+                        if(!r.ok) throw new Error("No encontrado");
+                        return r.blob();
+                    })
+                    .then(blob => {
+                        const file = new File([blob], "panamajoe.tap");
+                        forceLoadFile(file);
+                        statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA 2 MINUTOS.';
+                    })
+                    .catch(err => {
+                        statusEl.textContent = 'Auto-carga fallida. Usa el botón "Cargar ROM manual".';
+                    });
+            }
+
+            // 2. CARGA MANUAL (Ahora sí, blindada contra errores)
+            manualLoadInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                statusEl.textContent = 'Iniciando ' + file.name + '...';
+                forceLoadFile(file);
+                statusEl.textContent = '¡Cinta cargando! ESPERA 2 MINUTOS A QUE SE LLENE LA MEMORIA.';
+            });
+
+            setTimeout(autoLoadROM, 1000);
+
+            // SISTEMA DE INYECCIÓN DE TECLAS
+            const keyMap = { 
+                '1':'1', '2':'2', '3':'3', '4':'4', '5':'5', 
+                'q':'q', 'a':'a', 'o':'o', 'p':'p', 
+                'Space':' ', 'Enter':'Enter' 
+            };
+
+            function sendKey(key, isDown) {
+                const canvas = document.querySelector('#jsspeccy canvas');
+                if (!canvas) return;
+                
+                canvas.focus();
+                
+                const actualKey = keyMap[key] || key;
+                let keyCode = actualKey.charCodeAt(0);
+                if (key === 'Enter') keyCode = 13;
+                if (key === 'Space') keyCode = 32;
+
+                const eventType = isDown ? 'keydown' : 'keyup';
+                
+                const event = new KeyboardEvent(eventType, {
+                    key: actualKey, code: 'Key' + actualKey.toUpperCase(),
+                    keyCode: keyCode, which: keyCode, bubbles: true, cancelable: true 
+                });
+                
+                Object.defineProperty(event, 'keyCode', {get: () => keyCode});
+                Object.defineProperty(event, 'which', {get: () => keyCode});
+                
+                canvas.dispatchEvent(event);
+            }
+
+            document.querySelectorAll('.btn').forEach(btn => {
+                const key = btn.getAttribute('data-key');
+                
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); 
+                    btn.classList.add('active');
+                    sendKey(key, true);
+                });
+                
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    btn.classList.remove('active');
+                    sendKey(key, false);
+                });
+                
+                btn.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    btn.classList.remove('active');
+                    sendKey(key, false);
+                });
+            });
+
+            window.addEventListener('contextmenu', e => e.preventDefault());
+        });
+    </script>
+</body>
+</html>
