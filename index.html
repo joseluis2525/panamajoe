@@ -109,7 +109,7 @@
 
     <script src="jsspeccy/jsspeccy.js"></script>
 
-    <script>
+        <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
 
@@ -122,8 +122,6 @@
 
             function loadROM() {
                 statusEl.textContent = 'Descargando juego desde el servidor...';
-                
-                // ¡AQUÍ ESTÁ LA MAGIA! Ponemos tu ruta absoluta para que nunca se pierda.
                 const absoluteURL = 'https://joseluis2525.github.io/panamajoe/panamajoe.tap';
                 
                 fetch(absoluteURL)
@@ -132,18 +130,37 @@
                         return response.blob();
                     })
                     .then(blob => {
-                        const file = new File([blob], "panamajoe.tap");
-                        speccy.openTAPFile(file);
-                        statusEl.textContent = '¡Juego Cargado! Usa START (Menú) y SALTAR.';
+                        // Creamos el archivo virtual
+                        const file = new File([blob], "panamajoe.tap", { type: "application/octet-stream" });
+                        
+                        // INTENTO 1: Buscar el comando real de tu versión de JSSpeccy
+                        if (typeof speccy.loadFile === 'function') { speccy.loadFile(file); }
+                        else if (typeof speccy.load === 'function') { speccy.load(file); }
+                        else if (typeof speccy.openFile === 'function') { speccy.openFile(file); }
+                        else if (typeof speccy.loadTape === 'function') { speccy.loadTape(file); }
+                        else if (speccy.machine && typeof speccy.machine.loadFile === 'function') { speccy.machine.loadFile(file); }
+                        else {
+                            // INTENTO 2 (EL TRUCO MAESTRO): Simular "Arrastrar y Soltar"
+                            const dt = new DataTransfer();
+                            dt.items.add(file);
+                            const dropEvent = new DragEvent('drop', { 
+                                bubbles: true, cancelable: true, dataTransfer: dt 
+                            });
+                            document.getElementById('jsspeccy').dispatchEvent(dropEvent);
+                            // También lo intentamos directo en el canvas por si acaso
+                            const canvas = document.querySelector('#jsspeccy canvas');
+                            if(canvas) canvas.dispatchEvent(dropEvent);
+                        }
+                        
+                        statusEl.textContent = '¡Juego Cargado! Toca START para el menú.';
                     })
                     .catch(err => {
                         console.error(err);
-                        // Ahora mostrará el error TÉCNICO exacto si vuelve a fallar
                         statusEl.textContent = '❌ Error técnico: ' + err.message;
                     });
             }
 
-            // Damos 1.5 segundos al emulador para despertar antes de inyectarle la ROM
+            // Damos 1.5 segundos al emulador para despertar
             setTimeout(loadROM, 1500);
 
             // Controles táctiles
@@ -176,6 +193,7 @@
                 });
             });
 
+            // Evitar menú contextual
             window.addEventListener('contextmenu', e => e.preventDefault());
         });
     </script>
