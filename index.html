@@ -2,12 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Obligar al celular a NO usar memoria caché -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panama Joe v3</title>
+    <title>Panama Joe (v4)</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -20,20 +17,27 @@
         #game-header h1 { font-size: 1.1em; color: #f0c040; margin: 0; }
         #status { font-size: 0.8em; color: #aaa; margin: 2px 0; }
 
-        .upload-btn {
-            display: inline-block; background: #333; border: 1px solid #f0c040;
-            padding: 5px 10px; border-radius: 5px; font-size: 0.8em; color: #f0c040;
+        /* Pantalla de permiso inicial para burlar la seguridad de Android */
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.9); z-index: 99999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
-        .upload-btn:active { background: #f0c040; color: #000; }
-        #manual-load { display: none; }
+        #start-overlay button {
+            padding: 20px 40px; font-size: 1.2em; font-weight: bold;
+            background: #27ae60; color: white; border: 3px solid #2ecc71; border-radius: 15px;
+            box-shadow: 0 0 20px rgba(39, 174, 96, 0.6); cursor: pointer;
+        }
 
         #emulator-container {
-            width: 100%; max-width: 600px; display: flex; justify-content: center;
+            width: 100%; max-width: 600px; 
+            max-height: 45vh; /* Evita que el juego empuje los botones hacia abajo */
+            display: flex; justify-content: center;
         }
         
         [class*="menu"], [class*="toolbar"], [class*="statusbar"] { display: none !important; }
         
-        #jsspeccy { width: 100%; aspect-ratio: 4/3; border: 1px solid #333; overflow: hidden; background: #000;}
+        #jsspeccy { width: 100%; height: 100%; aspect-ratio: 4/3; border: 1px solid #333; overflow: hidden; background: #000;}
         #jsspeccy canvas { width: 100% !important; height: 100% !important; image-rendering: pixelated; outline: none; object-fit: contain; }
 
         #gamepad-area {
@@ -41,60 +45,59 @@
             padding: 10px; z-index: 10; flex-grow: 1; display: flex; flex-direction: column;
         }
 
-        /* --- BOTONES AZUL Y VERDE (Forzados a verse) --- */
-        .top-menu { display: flex; justify-content: space-evenly; width: 100%; margin-bottom: 15px; }
+        /* Botones de Menú Superiores */
+        .top-menu { display: flex; justify-content: space-evenly; width: 100%; margin-bottom: 10px; }
         .top-menu .btn { 
-            width: 45%; height: 45px; font-size: 0.9em; border-radius: 8px; font-weight: bold;
+            width: 45%; height: 40px; font-size: 0.9em; border-radius: 8px; font-weight: bold;
             display: flex; justify-content: center; align-items: center; text-align: center;
         }
-        
         .btn-blue { background: #2980b9 !important; border: 2px solid #5dade2 !important; color: white !important;}
-        .btn-blue:active, .btn-blue.active { background: #3498db !important; }
-        
         .btn-green { background: #27ae60 !important; border: 2px solid #58d68d !important; color: white !important;}
-        .btn-green:active, .btn-green.active { background: #2ecc71 !important; }
 
-        .game-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; margin-top: auto; margin-bottom: auto;}
-        .d-pad { display: grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px; gap: 5px; }
+        .game-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; height: 100%;}
         
-        .btn {
-            background: #333; border: 2px solid #555; border-radius: 8px; color: #fff;
-            display: flex; justify-content: center; align-items: center; font-size: 1.2em;
-            user-select: none; -webkit-user-select: none; font-weight: bold; cursor: pointer;
-        }
-        .btn:active, .btn.active { background: #f0c040; color: #000; }
+        /* Cruceta adaptada a tus imágenes */
+        .d-pad { display: grid; grid-template-columns: 70px 70px 70px; grid-template-rows: 70px 70px; gap: 5px; }
+        
+        .btn { user-select: none; -webkit-user-select: none; font-weight: bold; cursor: pointer; }
+        .btn:active, .btn.active { filter: brightness(1.5); }
+
+        /* Formato especial para que tus PNGs se vean perfectos */
+        .img-btn { background: transparent; border: none; display: flex; justify-content: center; align-items: center; }
+        .img-btn img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; border-radius: 50%;}
 
         #btn-up { grid-column: 2; grid-row: 1; }
         #btn-left { grid-column: 1; grid-row: 2; }
         #btn-down { grid-column: 2; grid-row: 2; }
         #btn-right { grid-column: 3; grid-row: 2; }
 
-        .btn-action { width: 85px; height: 85px; border-radius: 50%; background: #a93226; border: 3px solid #e6b0aa; }
-        .btn-action:active, .btn-action.active { background: #f0c040; }
-
+        .btn-action { width: 85px; height: 85px; border-radius: 50%; background: #a93226; border: 3px solid #e6b0aa; display: flex; justify-content: center; align-items: center; color: white;}
+        
+        /* MODO HORIZONTAL (LANDSCAPE) */
         @media (orientation: landscape) {
             #game-header { display: none; } 
-            #emulator-container { width: 100vw; height: 100vh; max-width: none; position: fixed; top: 0; left: 0; z-index: 1;}
+            #emulator-container { width: 100vw; height: 100vh; max-width: none; max-height: none; position: fixed; top: 0; left: 0; z-index: 1;}
             #jsspeccy { height: 100vh; width: 100vw; border: none; }
             #gamepad-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; border: none; padding: 0; pointer-events: none; z-index: 9999; display: block;}
-            .btn { pointer-events: auto; opacity: 0.7; } 
-            .btn:active, .btn.active { opacity: 1; }
+            .btn { pointer-events: auto; opacity: 0.8; } 
             .top-menu { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 320px; gap: 10px;}
             .game-controls { position: static; display: block; }
-            .d-pad { position: absolute; bottom: 20px; left: 30px; transform: scale(1.1); transform-origin: bottom left; }
-            .d-pad .btn { border-radius: 50%; } 
-            #btn-jump { position: absolute; bottom: 30px; right: 40px; width: 90px; height: 90px; }
+            .d-pad { position: absolute; bottom: 20px; left: 30px; transform: scale(1.2); transform-origin: bottom left; }
+            #btn-jump { position: absolute; bottom: 30px; right: 40px; width: 100px; height: 100px; }
         }
     </style>
 </head>
 <body>
 
+    <!-- PANTALLA MÁGICA PARA SALTAR LA SEGURIDAD DE ANDROID -->
+    <div id="start-overlay">
+        <button onclick="iniciarSistema()">▶ TOCAR AQUÍ PARA CARGAR EL JUEGO</button>
+        <p style="color: #aaa; margin-top: 20px; font-size: 0.8em; text-align: center;">Esto permite que el casete se conecte automáticamente.</p>
+    </div>
+
     <div id="game-header">
-        <!-- El título v3 nos confirmará que cargó el código nuevo -->
-        <h1>Panama Joe (v3)</h1>
-        <div id="status">Iniciando emulador...</div>
-        <label for="manual-load" class="upload-btn">📂 Cargar manual</label>
-        <input type="file" id="manual-load" accept=".tap">
+        <h1>Panama Joe (v4)</h1>
+        <div id="status">Esperando...</div>
     </div>
 
     <div id="emulator-container">
@@ -108,11 +111,12 @@
         </div>
 
         <div class="game-controls">
+            <!-- TUS IMÁGENES PNG (Asegúrate de subirlas al GitHub) -->
             <div class="d-pad">
-                <div id="btn-up" class="btn" data-key="q">↑</div>
-                <div id="btn-left" class="btn" data-key="o">←</div>
-                <div id="btn-down" class="btn" data-key="a">↓</div>
-                <div id="btn-right" class="btn" data-key="i">→</div>
+                <div id="btn-up" class="btn img-btn" data-key="q"><img src="up.png" alt="Up"></div>
+                <div id="btn-left" class="btn img-btn" data-key="o"><img src="lft.png" alt="Left"></div>
+                <div id="btn-down" class="btn img-btn" data-key="a"><img src="dwn.png" alt="Down"></div>
+                <div id="btn-right" class="btn img-btn" data-key="i"><img src="rgt.png" alt="Right"></div>
             </div>
             <div id="btn-jump" class="btn btn-action" data-key="Space">SALTO</div>
         </div>
@@ -121,45 +125,37 @@
     <script src="jsspeccy/jsspeccy.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const statusEl = document.getElementById('status');
+        let speccy = null;
 
-            const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
+        function iniciarSistema() {
+            // 1. Ocultar la pantalla negra gigante
+            document.getElementById('start-overlay').style.display = 'none';
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Auto-cargando casete...';
+
+            // 2. Iniciar el Emulador
+            speccy = JSSpeccy(document.getElementById('jsspeccy'), {
                 autoStart: true, autoLoadTapes: true, sandbox: false, machine: 48,
                 uiEnabled: false, zoom: 1
             });
 
-            function autoLoadROM() {
-                statusEl.textContent = 'Auto-cargando juego...';
-                fetch('panamajoe.tap')
-                    .then(r => r.blob())
-                    .then(blob => {
-                        const file = new File([blob], "panamajoe.tap");
-                        if (typeof speccy.openTAPFile === 'function') { speccy.openTAPFile(file); }
-                        else {
-                            const dt = new DataTransfer(); dt.items.add(file);
-                            document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
-                        }
-                        statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA.';
-                    }).catch(e => statusEl.textContent = 'Falla red. Usa botón manual.');
-            }
+            // 3. Ya tenemos "permiso" del usuario, ¡descargamos el TAP sin bloqueos!
+            fetch('panamajoe.tap')
+                .then(r => r.blob())
+                .then(blob => {
+                    const file = new File([blob], "panamajoe.tap");
+                    if (typeof speccy.openTAPFile === 'function') { speccy.openTAPFile(file); }
+                    else {
+                        const dt = new DataTransfer(); dt.items.add(file);
+                        document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
+                    }
+                    statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA.';
+                }).catch(e => statusEl.textContent = 'Falla red. Falta archivo panamajoe.tap');
+        }
 
-            document.getElementById('manual-load').addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                statusEl.textContent = 'Cargando... ESPERA LAS RAYAS.';
-                if (typeof speccy.openTAPFile === 'function') speccy.openTAPFile(file);
-            });
-
-            // Los navegadores de celular bloquean auto-carga sin que el usuario toque la pantalla. 
-            // Si en 2 segundos no arranca solo, toca "Cargar manual".
-            setTimeout(autoLoadROM, 1500);
-
-            const keyMap = { 
-                '4':'4', 'j':'J', 
-                'q':'Q', 'a':'A', 'o':'O', 'i':'I', 
-                'Space':' '
-            };
+        // SISTEMA DE CONTROLES
+        document.addEventListener('DOMContentLoaded', () => {
+            const keyMap = { '4':'4', 'j':'J', 'q':'Q', 'a':'A', 'o':'O', 'i':'I', 'Space':' ' };
 
             function sendKey(key, isDown) {
                 const canvas = document.querySelector('#jsspeccy canvas');
