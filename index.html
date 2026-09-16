@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panama Joe - Android Ultimate</title>
+    <title>Panama Joe - Android Final</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -27,7 +27,6 @@
             width: 100%; max-width: 600px; display: flex; justify-content: center;
         }
         
-        /* Ocultar barra blanca del emulador */
         [class*="menu"], [class*="toolbar"], [class*="statusbar"] { display: none !important; }
         
         #jsspeccy { width: 100%; aspect-ratio: 4/3; border: 1px solid #333; overflow: hidden; background: #000;}
@@ -38,17 +37,19 @@
             padding: 10px; z-index: 10; flex-grow: 1; display: flex; flex-direction: column;
         }
 
-        /* --- LOS NUEVOS BOTONES AZUL Y VERDE --- */
+        /* --- BOTONES AZUL Y VERDE ASEGURADOS --- */
         .top-menu { display: flex; justify-content: center; gap: 15px; margin-bottom: 15px; width: 100%; }
-        .top-menu .btn { padding: 0 15px; height: 45px; font-size: 0.9em; border-radius: 25px; border-width: 2px; }
+        .top-menu .btn { 
+            padding: 10px 20px; font-size: 1em; border-radius: 8px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center; text-align: center;
+        }
         
-        .btn-blue { background: #1b4f72 !important; border-color: #3498db !important; }
+        .btn-blue { background: #2980b9 !important; border: 2px solid #5dade2 !important; color: white;}
         .btn-blue:active, .btn-blue.active { background: #3498db !important; }
         
-        .btn-green { background: #145a32 !important; border-color: #2ecc71 !important; }
+        .btn-green { background: #27ae60 !important; border: 2px solid #58d68d !important; color: white;}
         .btn-green:active, .btn-green.active { background: #2ecc71 !important; }
 
-        /* Controles de juego */
         .game-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; margin-top: auto; margin-bottom: auto;}
         .d-pad { display: grid; grid-template-columns: 60px 60px 60px; grid-template-rows: 60px 60px; gap: 5px; }
         
@@ -67,9 +68,6 @@
         .btn-action { width: 85px; height: 85px; border-radius: 50%; background: #a93226; border: 3px solid #e6b0aa; }
         .btn-action:active, .btn-action.active { background: #f0c040; }
 
-        /* =========================================
-           MODO HORIZONTAL (GAMEPAD FLOTANTE)
-           ========================================= */
         @media (orientation: landscape) {
             #game-header { display: none; } 
             
@@ -86,26 +84,22 @@
                 z-index: 9999; display: block;
             }
 
-            .btn { pointer-events: auto; opacity: 0.6; } 
-            .btn:active, .btn.active { opacity: 0.9; }
+            .btn { pointer-events: auto; opacity: 0.7; } 
+            .btn:active, .btn.active { opacity: 1; }
 
-            /* Botones de menú anclados arriba al centro */
             .top-menu { 
                 position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
                 width: max-content; gap: 20px;
             }
 
-            /* Desarmar la caja flex para usar posiciones absolutas en la cruceta */
             .game-controls { position: static; display: block; }
             
-            /* Cruceta en la esquina inferior izquierda */
             .d-pad { 
                 position: absolute; bottom: 20px; left: 30px; 
                 transform: scale(1.1); transform-origin: bottom left; 
             }
             .d-pad .btn { border-radius: 50%; } 
 
-            /* Salto en la esquina inferior derecha */
             #btn-jump { 
                 position: absolute; bottom: 30px; right: 40px; 
                 width: 90px; height: 90px; 
@@ -128,19 +122,19 @@
 
     <div id="gamepad-area">
         
-        <!-- LOS NUEVOS BOTONES EVIDENTES Y CLAROS -->
+        <!-- LOS BOTONES AZUL Y VERDE CORREGIDOS -->
         <div class="top-menu">
             <div class="btn btn-blue" data-key="4">⚙️ CONFIG (4)</div>
-            <div class="btn btn-green" data-key="5">▶ JUGAR (5)</div>
+            <div class="btn btn-green" data-key="j">▶ JUGAR (Nivel 1)</div>
         </div>
 
         <div class="game-controls">
-            <!-- D-PAD (Mapeado internamente a Q, A, O, P) -->
+            <!-- D-PAD Mapeado a Q, A, O, I (Para evitar conflicto con la P de Pausa) -->
             <div class="d-pad">
                 <div id="btn-up" class="btn" data-key="q">↑</div>
                 <div id="btn-left" class="btn" data-key="o">←</div>
                 <div id="btn-down" class="btn" data-key="a">↓</div>
-                <div id="btn-right" class="btn" data-key="p">→</div>
+                <div id="btn-right" class="btn" data-key="i">→</div>
             </div>
             <div id="btn-jump" class="btn btn-action" data-key="Space">SALTO</div>
         </div>
@@ -151,54 +145,40 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
-            const manualLoadInput = document.getElementById('manual-load');
 
             const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
                 autoStart: true, autoLoadTapes: true, sandbox: false, machine: 48,
                 uiEnabled: false, zoom: 1
             });
 
-            function forceLoadFile(file) {
-                if (typeof speccy.openTAPFile === 'function') {
-                    try { speccy.openTAPFile(file); return; } catch(e){}
-                }
-                const dt = new DataTransfer(); dt.items.add(file);
-                const dropEvent = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
-                document.getElementById('jsspeccy').dispatchEvent(dropEvent);
-                const canvas = document.querySelector('#jsspeccy canvas');
-                if(canvas) canvas.dispatchEvent(dropEvent);
-            }
-
             function autoLoadROM() {
-                statusEl.textContent = 'Auto-cargando juego desde GitHub...';
+                statusEl.textContent = 'Auto-cargando juego...';
                 fetch('panamajoe.tap')
-                    .then(response => {
-                        if (!response.ok) throw new Error("No encontrado");
-                        return response.blob();
-                    })
+                    .then(r => r.blob())
                     .then(blob => {
                         const file = new File([blob], "panamajoe.tap");
-                        forceLoadFile(file);
+                        if (typeof speccy.openTAPFile === 'function') { speccy.openTAPFile(file); }
+                        else {
+                            const dt = new DataTransfer(); dt.items.add(file);
+                            document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
+                        }
                         statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA 2 MINUTOS.';
-                    })
-                    .catch(err => {
-                        statusEl.textContent = 'Error. Usa "Cargar manual".';
-                    });
+                    }).catch(e => statusEl.textContent = 'Falla red. Usa botón manual.');
             }
 
-            manualLoadInput.addEventListener('change', function(event) {
-                const file = event.target.files[0];
+            document.getElementById('manual-load').addEventListener('change', function(e) {
+                const file = e.target.files[0];
                 if (!file) return;
                 statusEl.textContent = 'Cargando... ESPERA LAS RAYAS.';
-                forceLoadFile(file);
+                if (typeof speccy.openTAPFile === 'function') speccy.openTAPFile(file);
             });
 
             setTimeout(autoLoadROM, 1500);
 
-            // MAPA DE TECLAS CLÁSICAS
+            // MAPA DE TECLAS (Agregada la J para jugar y la I para la derecha)
             const keyMap = { 
-                '4':'4', '5':'5', 
-                'q':'Q', 'a':'A', 'o':'O', 'p':'P', 
+                '4':'4', 'j':'J', 
+                'q':'Q', 'a':'A', 'o':'O', 'i':'I', 
                 'Space':' '
             };
 
