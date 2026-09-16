@@ -2,8 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <!-- Obligar al celular a NO usar memoria caché -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panama Joe - Android Final</title>
+    <title>Panama Joe v3</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -18,7 +22,7 @@
 
         .upload-btn {
             display: inline-block; background: #333; border: 1px solid #f0c040;
-            padding: 3px 10px; border-radius: 5px; font-size: 0.8em; color: #f0c040;
+            padding: 5px 10px; border-radius: 5px; font-size: 0.8em; color: #f0c040;
         }
         .upload-btn:active { background: #f0c040; color: #000; }
         #manual-load { display: none; }
@@ -37,17 +41,17 @@
             padding: 10px; z-index: 10; flex-grow: 1; display: flex; flex-direction: column;
         }
 
-        /* --- BOTONES AZUL Y VERDE ASEGURADOS --- */
-        .top-menu { display: flex; justify-content: center; gap: 15px; margin-bottom: 15px; width: 100%; }
+        /* --- BOTONES AZUL Y VERDE (Forzados a verse) --- */
+        .top-menu { display: flex; justify-content: space-evenly; width: 100%; margin-bottom: 15px; }
         .top-menu .btn { 
-            padding: 10px 20px; font-size: 1em; border-radius: 8px; font-weight: bold;
+            width: 45%; height: 45px; font-size: 0.9em; border-radius: 8px; font-weight: bold;
             display: flex; justify-content: center; align-items: center; text-align: center;
         }
         
-        .btn-blue { background: #2980b9 !important; border: 2px solid #5dade2 !important; color: white;}
+        .btn-blue { background: #2980b9 !important; border: 2px solid #5dade2 !important; color: white !important;}
         .btn-blue:active, .btn-blue.active { background: #3498db !important; }
         
-        .btn-green { background: #27ae60 !important; border: 2px solid #58d68d !important; color: white;}
+        .btn-green { background: #27ae60 !important; border: 2px solid #58d68d !important; color: white !important;}
         .btn-green:active, .btn-green.active { background: #2ecc71 !important; }
 
         .game-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; margin-top: auto; margin-bottom: auto;}
@@ -70,47 +74,24 @@
 
         @media (orientation: landscape) {
             #game-header { display: none; } 
-            
-            #emulator-container { 
-                width: 100vw; height: 100vh; max-width: none;
-                position: fixed; top: 0; left: 0; z-index: 1;
-            }
+            #emulator-container { width: 100vw; height: 100vh; max-width: none; position: fixed; top: 0; left: 0; z-index: 1;}
             #jsspeccy { height: 100vh; width: 100vw; border: none; }
-
-            #gamepad-area {
-                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-                background: transparent; border: none; padding: 0;
-                pointer-events: none; 
-                z-index: 9999; display: block;
-            }
-
+            #gamepad-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; border: none; padding: 0; pointer-events: none; z-index: 9999; display: block;}
             .btn { pointer-events: auto; opacity: 0.7; } 
             .btn:active, .btn.active { opacity: 1; }
-
-            .top-menu { 
-                position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-                width: max-content; gap: 20px;
-            }
-
+            .top-menu { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 320px; gap: 10px;}
             .game-controls { position: static; display: block; }
-            
-            .d-pad { 
-                position: absolute; bottom: 20px; left: 30px; 
-                transform: scale(1.1); transform-origin: bottom left; 
-            }
+            .d-pad { position: absolute; bottom: 20px; left: 30px; transform: scale(1.1); transform-origin: bottom left; }
             .d-pad .btn { border-radius: 50%; } 
-
-            #btn-jump { 
-                position: absolute; bottom: 30px; right: 40px; 
-                width: 90px; height: 90px; 
-            }
+            #btn-jump { position: absolute; bottom: 30px; right: 40px; width: 90px; height: 90px; }
         }
     </style>
 </head>
 <body>
 
     <div id="game-header">
-        <h1>Panama Joe</h1>
+        <!-- El título v3 nos confirmará que cargó el código nuevo -->
+        <h1>Panama Joe (v3)</h1>
         <div id="status">Iniciando emulador...</div>
         <label for="manual-load" class="upload-btn">📂 Cargar manual</label>
         <input type="file" id="manual-load" accept=".tap">
@@ -121,15 +102,12 @@
     </div>
 
     <div id="gamepad-area">
-        
-        <!-- LOS BOTONES AZUL Y VERDE CORREGIDOS -->
         <div class="top-menu">
             <div class="btn btn-blue" data-key="4">⚙️ CONFIG (4)</div>
-            <div class="btn btn-green" data-key="j">▶ JUGAR (Nivel 1)</div>
+            <div class="btn btn-green" data-key="j">▶ JUGAR (J)</div>
         </div>
 
         <div class="game-controls">
-            <!-- D-PAD Mapeado a Q, A, O, I (Para evitar conflicto con la P de Pausa) -->
             <div class="d-pad">
                 <div id="btn-up" class="btn" data-key="q">↑</div>
                 <div id="btn-left" class="btn" data-key="o">←</div>
@@ -162,7 +140,7 @@
                             const dt = new DataTransfer(); dt.items.add(file);
                             document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
                         }
-                        statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA 2 MINUTOS.';
+                        statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA.';
                     }).catch(e => statusEl.textContent = 'Falla red. Usa botón manual.');
             }
 
@@ -173,9 +151,10 @@
                 if (typeof speccy.openTAPFile === 'function') speccy.openTAPFile(file);
             });
 
+            // Los navegadores de celular bloquean auto-carga sin que el usuario toque la pantalla. 
+            // Si en 2 segundos no arranca solo, toca "Cargar manual".
             setTimeout(autoLoadROM, 1500);
 
-            // MAPA DE TECLAS (Agregada la J para jugar y la I para la derecha)
             const keyMap = { 
                 '4':'4', 'j':'J', 
                 'q':'Q', 'a':'A', 'o':'O', 'i':'I', 
