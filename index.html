@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panama Joe (v4)</title>
+    <title>Panama Joe Definitivo</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -12,149 +12,163 @@
             display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
             height: 100vh; width: 100vw; overflow: hidden; touch-action: none;
         }
-        
-        #game-header { width: 100%; text-align: center; padding: 5px; background: #111; z-index: 20; border-bottom: 2px solid #f0c040;}
-        #game-header h1 { font-size: 1.1em; color: #f0c040; margin: 0; }
-        #status { font-size: 0.8em; color: #aaa; margin: 2px 0; }
 
-        /* Pantalla de permiso inicial para burlar la seguridad de Android */
-        #start-overlay {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.9); z-index: 99999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
-        #start-overlay button {
-            padding: 20px 40px; font-size: 1.2em; font-weight: bold;
-            background: #27ae60; color: white; border: 3px solid #2ecc71; border-radius: 15px;
-            box-shadow: 0 0 20px rgba(39, 174, 96, 0.6); cursor: pointer;
-        }
-
+        /* VISOR DEL JUEGO */
         #emulator-container {
-            width: 100%; max-width: 600px; 
-            max-height: 45vh; /* Evita que el juego empuje los botones hacia abajo */
-            display: flex; justify-content: center;
+            width: 100%; height: 45vh; /* Ocupa exactamente el 45% de arriba */
+            background: #111; display: flex; justify-content: center; align-items: center;
+            border-bottom: 2px solid #f0c040; position: relative;
         }
         
         [class*="menu"], [class*="toolbar"], [class*="statusbar"] { display: none !important; }
-        
-        #jsspeccy { width: 100%; height: 100%; aspect-ratio: 4/3; border: 1px solid #333; overflow: hidden; background: #000;}
-        #jsspeccy canvas { width: 100% !important; height: 100% !important; image-rendering: pixelated; outline: none; object-fit: contain; }
+        #jsspeccy { width: 100%; height: 100%; aspect-ratio: 4/3; background: #000; }
+        #jsspeccy canvas { width: 100% !important; height: 100% !important; image-rendering: pixelated; object-fit: contain; }
 
+        /* TEXTO DE ESTADO FLOTANTE */
+        #status-bar {
+            position: absolute; top: 0; left: 0; width: 100%; text-align: center;
+            background: rgba(0,0,0,0.7); color: #f0c040; font-size: 0.8em; padding: 2px; z-index: 50;
+        }
+
+        /* ZONA DE CONTROLES (El 55% de abajo) */
         #gamepad-area {
-            width: 100%; max-width: 600px; background: #1a1a2e;
-            padding: 10px; z-index: 10; flex-grow: 1; display: flex; flex-direction: column;
+            width: 100%; height: 55vh; background: #1a1a2e; padding: 10px;
+            display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
         }
 
-        /* Botones de Menú Superiores */
-        .top-menu { display: flex; justify-content: space-evenly; width: 100%; margin-bottom: 10px; }
-        .top-menu .btn { 
-            width: 45%; height: 40px; font-size: 0.9em; border-radius: 8px; font-weight: bold;
-            display: flex; justify-content: center; align-items: center; text-align: center;
+        /* FILA SUPERIOR: Botón 4, Cargar, Botón J */
+        .toolbar {
+            display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 600px;
         }
-        .btn-blue { background: #2980b9 !important; border: 2px solid #5dade2 !important; color: white !important;}
-        .btn-green { background: #27ae60 !important; border: 2px solid #58d68d !important; color: white !important;}
-
-        .game-controls { display: flex; justify-content: space-around; align-items: center; width: 100%; height: 100%;}
+        .btn-tool {
+            flex: 1; height: 45px; margin: 0 5px; font-weight: bold; border-radius: 8px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer; border: 2px solid;
+            color: white; font-size: 0.9em; user-select: none;
+        }
+        .btn-blue { background: #2980b9; border-color: #5dade2; }
+        .btn-blue:active { background: #3498db; }
         
-        /* Cruceta adaptada a tus imágenes */
+        .btn-green { background: #27ae60; border-color: #58d68d; }
+        .btn-green:active { background: #2ecc71; }
+        
+        /* Botón de carga camuflado como botón normal */
+        .btn-load { background: #f39c12; border-color: #f1c40f; position: relative; overflow: hidden; }
+        .btn-load input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        /* ZONA INFERIOR: D-PAD y SALTO */
+        .action-area {
+            display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 500px;
+        }
+
         .d-pad { display: grid; grid-template-columns: 70px 70px 70px; grid-template-rows: 70px 70px; gap: 5px; }
         
-        .btn { user-select: none; -webkit-user-select: none; font-weight: bold; cursor: pointer; }
-        .btn:active, .btn.active { filter: brightness(1.5); }
-
-        /* Formato especial para que tus PNGs se vean perfectos */
         .img-btn { background: transparent; border: none; display: flex; justify-content: center; align-items: center; }
-        .img-btn img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; border-radius: 50%;}
+        .img-btn img { width: 100%; height: 100%; object-fit: contain; pointer-events: none;}
+        .img-btn:active img { filter: brightness(1.5); transform: scale(0.95); }
 
         #btn-up { grid-column: 2; grid-row: 1; }
         #btn-left { grid-column: 1; grid-row: 2; }
         #btn-down { grid-column: 2; grid-row: 2; }
         #btn-right { grid-column: 3; grid-row: 2; }
 
-        .btn-action { width: 85px; height: 85px; border-radius: 50%; background: #a93226; border: 3px solid #e6b0aa; display: flex; justify-content: center; align-items: center; color: white;}
-        
-        /* MODO HORIZONTAL (LANDSCAPE) */
+        .btn-jump { 
+            width: 90px; height: 90px; border-radius: 50%; background: #c0392b; 
+            border: 4px solid #e74c3c; color: white; font-weight: bold;
+            display: flex; justify-content: center; align-items: center; user-select: none;
+        }
+        .btn-jump:active { background: #e74c3c; transform: scale(0.95); }
+
+        /* MODO HORIZONTAL (Todo superpuesto al juego) */
         @media (orientation: landscape) {
-            #game-header { display: none; } 
-            #emulator-container { width: 100vw; height: 100vh; max-width: none; max-height: none; position: fixed; top: 0; left: 0; z-index: 1;}
-            #jsspeccy { height: 100vh; width: 100vw; border: none; }
-            #gamepad-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; border: none; padding: 0; pointer-events: none; z-index: 9999; display: block;}
-            .btn { pointer-events: auto; opacity: 0.8; } 
-            .top-menu { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 320px; gap: 10px;}
-            .game-controls { position: static; display: block; }
-            .d-pad { position: absolute; bottom: 20px; left: 30px; transform: scale(1.2); transform-origin: bottom left; }
-            #btn-jump { position: absolute; bottom: 30px; right: 40px; width: 100px; height: 100px; }
+            #emulator-container { height: 100vh; position: fixed; top: 0; left: 0; z-index: 1; }
+            #gamepad-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 9999; pointer-events: none; justify-content: space-between;}
+            
+            .toolbar, .action-area { pointer-events: auto; opacity: 0.8; }
+            .toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 400px; }
+            .action-area { position: absolute; bottom: 20px; width: 100%; padding: 0 40px; }
         }
     </style>
 </head>
 <body>
 
-    <!-- PANTALLA MÁGICA PARA SALTAR LA SEGURIDAD DE ANDROID -->
-    <div id="start-overlay">
-        <button onclick="iniciarSistema()">▶ TOCAR AQUÍ PARA CARGAR EL JUEGO</button>
-        <p style="color: #aaa; margin-top: 20px; font-size: 0.8em; text-align: center;">Esto permite que el casete se conecte automáticamente.</p>
-    </div>
-
-    <div id="game-header">
-        <h1>Panama Joe (v4)</h1>
-        <div id="status">Esperando...</div>
-    </div>
-
     <div id="emulator-container">
+        <div id="status-bar">Iniciando sistema...</div>
         <div id="jsspeccy"></div>
     </div>
 
     <div id="gamepad-area">
-        <div class="top-menu">
-            <div class="btn btn-blue" data-key="4">⚙️ CONFIG (4)</div>
-            <div class="btn btn-green" data-key="j">▶ JUGAR (J)</div>
+        <!-- FILA SUPERIOR: A LA VISTA DE TODOS -->
+        <div class="toolbar">
+            <div class="btn-tool btn-blue" data-key="4">⚙️ OPCIÓN 4</div>
+            
+            <div class="btn-tool btn-load">
+                📂 CARGAR .TAP
+                <!-- El input invisible sobre el botón -->
+                <input type="file" id="manual-load" accept=".tap">
+            </div>
+            
+            <div class="btn-tool btn-green" data-key="j">▶ JUGAR (J)</div>
         </div>
 
-        <div class="game-controls">
-            <!-- TUS IMÁGENES PNG (Asegúrate de subirlas al GitHub) -->
+        <!-- FILA INFERIOR: CRUCETA PNG Y SALTO -->
+        <div class="action-area">
             <div class="d-pad">
-                <div id="btn-up" class="btn img-btn" data-key="q"><img src="up.png" alt="Up"></div>
-                <div id="btn-left" class="btn img-btn" data-key="o"><img src="lft.png" alt="Left"></div>
-                <div id="btn-down" class="btn img-btn" data-key="a"><img src="dwn.png" alt="Down"></div>
-                <div id="btn-right" class="btn img-btn" data-key="i"><img src="rgt.png" alt="Right"></div>
+                <div class="img-btn" id="btn-up" data-key="q"><img src="up.png" alt="Up"></div>
+                <div class="img-btn" id="btn-left" data-key="o"><img src="lft.png" alt="Left"></div>
+                <div class="img-btn" id="btn-down" data-key="a"><img src="dwn.png" alt="Down"></div>
+                <div class="img-btn" id="btn-right" data-key="i"><img src="rgt.png" alt="Right"></div>
             </div>
-            <div id="btn-jump" class="btn btn-action" data-key="Space">SALTO</div>
+            
+            <div class="btn-jump" data-key="Space">SALTO</div>
         </div>
     </div>
 
     <script src="jsspeccy/jsspeccy.js"></script>
 
     <script>
-        let speccy = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusEl = document.getElementById('status-bar');
 
-        function iniciarSistema() {
-            // 1. Ocultar la pantalla negra gigante
-            document.getElementById('start-overlay').style.display = 'none';
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = 'Auto-cargando casete...';
-
-            // 2. Iniciar el Emulador
-            speccy = JSSpeccy(document.getElementById('jsspeccy'), {
+            const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
                 autoStart: true, autoLoadTapes: true, sandbox: false, machine: 48,
                 uiEnabled: false, zoom: 1
             });
 
-            // 3. Ya tenemos "permiso" del usuario, ¡descargamos el TAP sin bloqueos!
-            fetch('panamajoe.tap')
-                .then(r => r.blob())
-                .then(blob => {
-                    const file = new File([blob], "panamajoe.tap");
-                    if (typeof speccy.openTAPFile === 'function') { speccy.openTAPFile(file); }
-                    else {
-                        const dt = new DataTransfer(); dt.items.add(file);
-                        document.getElementById('jsspeccy').dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt }));
-                    }
-                    statusEl.textContent = '¡Cargando! SI VES RAYAS, ESPERA.';
-                }).catch(e => statusEl.textContent = 'Falla red. Falta archivo panamajoe.tap');
-        }
+            // Motor de Carga Manual (A prueba de fallos)
+            document.getElementById('manual-load').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                statusEl.textContent = 'Cargando cinta... ESPERA LAS RAYAS.';
+                
+                if (typeof speccy.openTAPFile === 'function') {
+                    try { speccy.openTAPFile(file); return; } catch(err){}
+                }
+                
+                // Si falla el método normal, usamos arrastrar y soltar virtual
+                const dt = new DataTransfer(); dt.items.add(file);
+                const dropEvent = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
+                document.getElementById('jsspeccy').dispatchEvent(dropEvent);
+            });
 
-        // SISTEMA DE CONTROLES
-        document.addEventListener('DOMContentLoaded', () => {
+            // Intento de auto-carga sigilosa a los 2 segundos
+            setTimeout(() => {
+                if(statusEl.textContent.includes('Iniciando')) {
+                    statusEl.textContent = 'Intentando auto-cargar...';
+                    fetch('panamajoe.tap')
+                        .then(r => r.blob())
+                        .then(blob => {
+                            const file = new File([blob], "panamajoe.tap", { type: "application/octet-stream" });
+                            if (typeof speccy.openTAPFile === 'function') speccy.openTAPFile(file);
+                            statusEl.textContent = '¡Cargando! ESPERA 2 MINUTOS.';
+                        })
+                        .catch(err => {
+                            statusEl.textContent = 'Usa el botón naranja "CARGAR .TAP"';
+                        });
+                }
+            }, 2000);
+
+            // SISTEMA DE BOTONES TÁCTILES
             const keyMap = { '4':'4', 'j':'J', 'q':'Q', 'a':'A', 'o':'O', 'i':'I', 'Space':' ' };
 
             function sendKey(key, isDown) {
@@ -163,9 +177,7 @@
                 canvas.focus();
                 
                 const actualKey = keyMap[key] || key;
-                let keyCode;
-                if (key === 'Space') keyCode = 32;
-                else keyCode = actualKey.toUpperCase().charCodeAt(0);
+                let keyCode = (key === 'Space') ? 32 : actualKey.toUpperCase().charCodeAt(0);
 
                 const eventType = isDown ? 'keydown' : 'keyup';
                 const event = new KeyboardEvent(eventType, {
@@ -179,16 +191,17 @@
                 canvas.dispatchEvent(event);
             }
 
-            document.querySelectorAll('.btn').forEach(btn => {
+            // Asignar eventos a todos los botones que tienen "data-key"
+            document.querySelectorAll('[data-key]').forEach(btn => {
                 const key = btn.getAttribute('data-key');
                 btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); btn.classList.add('active'); sendKey(key, true);
+                    e.preventDefault(); sendKey(key, true);
                 });
                 btn.addEventListener('touchend', (e) => {
-                    e.preventDefault(); btn.classList.remove('active'); sendKey(key, false);
+                    e.preventDefault(); sendKey(key, false);
                 });
                 btn.addEventListener('touchcancel', (e) => {
-                    e.preventDefault(); btn.classList.remove('active'); sendKey(key, false);
+                    e.preventDefault(); sendKey(key, false);
                 });
             });
 
