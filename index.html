@@ -60,6 +60,36 @@
 
         .btn-action { width: 80px; height: 80px; border-radius: 50%; background: #a93226; border: 3px solid #e6b0aa; }
         .btn-action:active, .btn-action.active { background: #f0c040; }
+
+        /* Iconos PNG para las direcciones */
+        #btn-up { 
+            background-image: url('up.png'); 
+            background-size: 30px; 
+            background-repeat: no-repeat; 
+            background-position: center;
+            color: transparent;
+        }
+        #btn-down { 
+            background-image: url('dwn.png'); 
+            background-size: 30px; 
+            background-repeat: no-repeat; 
+            background-position: center;
+            color: transparent;
+        }
+        #btn-left { 
+            background-image: url('lft.png'); 
+            background-size: 30px; 
+            background-repeat: no-repeat; 
+            background-position: center;
+            color: transparent;
+        }
+        #btn-right { 
+            background-image: url('rgt.png'); 
+            background-size: 30px; 
+            background-repeat: no-repeat; 
+            background-position: center;
+            color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -88,12 +118,12 @@
 
         <div class="game-controls">
             <div class="d-pad">
-                <div id="btn-up" class="btn" data-key="6">↑</div>
-                <div id="btn-left" class="btn" data-key="7">←</div>
+                <div id="btn-up" class="btn" data-key="9">↑</div>
+                <div id="btn-left" class="btn" data-key="6">←</div>
                 <div id="btn-down" class="btn" data-key="8">↓</div>
-                <div id="btn-right" class="btn" data-key="9">→</div>
+                <div id="btn-right" class="btn" data-key="7">→</div>
             </div>
-            <div id="btn-jump" class="btn btn-action" data-key="Space">SALTO</div>
+            <div id="btn-jump" class="btn btn-action" data-key="0">SALTO</div>
         </div>
     </div>
 
@@ -145,7 +175,7 @@
                     });
             }
 
-            // 2. CARGA MANUAL (Ahora sí, blindada contra errores)
+            // 2. CARGA MANUAL (blindada contra errores)
             manualLoadInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
                 if (!file) return;
@@ -157,35 +187,40 @@
 
             setTimeout(autoLoadROM, 1000);
 
-            // SISTEMA DE INYECCIÓN DE TECLAS
+            // SISTEMA DE INYECCIÓN DE TECLAS (CORREGIDO)
+            // Los controles reales de Panama Joe en ZX Spectrum son:
+            // 6 = Izquierda, 7 = Derecha, 8 = Abajo, 9 = Arriba, 0 = Salto
             const keyMap = { 
                 '1':'1', '2':'2', '3':'3', '4':'4', '5':'5', 
-                '6':'6', '7':'7', '8':'8', '9':'9', 
-                'Space':' ', 'Enter':'Enter' 
+                '6':'6', '7':'7', '8':'8', '9':'9', '0':'0',
+                'Enter':'Enter'
             };
 
             function sendKey(key, isDown) {
-                const canvas = document.querySelector('#jsspeccy canvas');
-                if (!canvas) return;
-                
-                canvas.focus();
+                // El evento debe ir al document para que JSSpeccy 3 lo capture
+                const target = document;
                 
                 const actualKey = keyMap[key] || key;
+                
                 let keyCode = actualKey.charCodeAt(0);
                 if (key === 'Enter') keyCode = 13;
-                if (key === 'Space') keyCode = 32;
-
+                
                 const eventType = isDown ? 'keydown' : 'keyup';
                 
                 const event = new KeyboardEvent(eventType, {
-                    key: actualKey, code: 'Key' + actualKey.toUpperCase(),
-                    keyCode: keyCode, which: keyCode, bubbles: true, cancelable: true 
+                    key: actualKey,
+                    code: 'Digit' + actualKey,
+                    keyCode: keyCode,
+                    which: keyCode,
+                    bubbles: true,
+                    cancelable: true
                 });
                 
+                // Forzar keyCode y which (necesario en algunos navegadores)
                 Object.defineProperty(event, 'keyCode', {get: () => keyCode});
                 Object.defineProperty(event, 'which', {get: () => keyCode});
                 
-                canvas.dispatchEvent(event);
+                target.dispatchEvent(event);
             }
 
             document.querySelectorAll('.btn').forEach(btn => {
@@ -205,6 +240,22 @@
                 
                 btn.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
+                    btn.classList.remove('active');
+                    sendKey(key, false);
+                });
+
+                // Soporte para ratón (por si pruebas en PC)
+                btn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    btn.classList.add('active');
+                    sendKey(key, true);
+                });
+                btn.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    btn.classList.remove('active');
+                    sendKey(key, false);
+                });
+                btn.addEventListener('mouseleave', (e) => {
                     btn.classList.remove('active');
                     sendKey(key, false);
                 });
