@@ -50,8 +50,9 @@
             background: #333; border: 2px solid #555; border-radius: 8px; color: #fff;
             display: flex; justify-content: center; align-items: center; font-size: 1.2em;
             user-select: none; -webkit-user-select: none; font-weight: bold;
+            cursor: pointer;
         }
-        .btn:active, .btn.active { background: #f0c040; color: #000; }
+        .btn:active, .btn.active { background: #f0c040 !important; color: #000 !important; }
 
         #btn-up { grid-column: 2; grid-row: 1; }
         #btn-left { grid-column: 1; grid-row: 2; }
@@ -59,37 +60,13 @@
         #btn-right { grid-column: 3; grid-row: 2; }
 
         .btn-action { width: 80px; height: 80px; border-radius: 50%; background: #a93226; border: 3px solid #e6b0aa; }
-        .btn-action:active, .btn-action.active { background: #f0c040; }
+        .btn-action:active, .btn-action.active { background: #f0c040 !important; }
 
         /* Iconos PNG para las direcciones */
-        #btn-up { 
-            background-image: url('up.png'); 
-            background-size: 30px; 
-            background-repeat: no-repeat; 
-            background-position: center;
-            color: transparent;
-        }
-        #btn-down { 
-            background-image: url('dwn.png'); 
-            background-size: 30px; 
-            background-repeat: no-repeat; 
-            background-position: center;
-            color: transparent;
-        }
-        #btn-left { 
-            background-image: url('lft.png'); 
-            background-size: 30px; 
-            background-repeat: no-repeat; 
-            background-position: center;
-            color: transparent;
-        }
-        #btn-right { 
-            background-image: url('rgt.png'); 
-            background-size: 30px; 
-            background-repeat: no-repeat; 
-            background-position: center;
-            color: transparent;
-        }
+        #btn-up { background-image: url('up.png'); background-size: 30px; background-repeat: no-repeat; background-position: center; color: transparent; }
+        #btn-down { background-image: url('dwn.png'); background-size: 30px; background-repeat: no-repeat; background-position: center; color: transparent; }
+        #btn-left { background-image: url('lft.png'); background-size: 30px; background-repeat: no-repeat; background-position: center; color: transparent; }
+        #btn-right { background-image: url('rgt.png'); background-size: 30px; background-repeat: no-repeat; background-position: center; color: transparent; }
     </style>
 </head>
 <body>
@@ -142,29 +119,38 @@
                 zoom: 1
             });
 
-            // Función todoterreno para inyectar el archivo (Auto o Manual)
+            // Esperar a que JSSpeccy cree el canvas
+            let canvasEl = null;
+            function getCanvas() {
+                if (!canvasEl) {
+                    canvasEl = document.querySelector('#jsspeccy canvas');
+                    if (canvasEl) {
+                        // Asegurar que el canvas puede recibir foco
+                        if (!canvasEl.hasAttribute('tabindex')) {
+                            canvasEl.setAttribute('tabindex', '0');
+                        }
+                        // Cuando el usuario toque el canvas, darle foco
+                        canvasEl.addEventListener('click', () => canvasEl.focus());
+                        canvasEl.addEventListener('touchstart', () => canvasEl.focus(), { passive: true });
+                    }
+                }
+                return canvasEl;
+            }
+
             function forceLoadFile(file) {
                 if (typeof speccy.openTAPFile === 'function') {
                     try { speccy.openTAPFile(file); return; } catch(e){}
                 }
-                // Si la función falla, usamos el truco de arrastrar y soltar
                 const dt = new DataTransfer();
                 dt.items.add(file);
                 const dropEvent = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
-                
                 document.getElementById('jsspeccy').dispatchEvent(dropEvent);
-                const canvas = document.querySelector('#jsspeccy canvas');
-                if(canvas) canvas.dispatchEvent(dropEvent);
             }
 
-            // 1. CARGA AUTOMÁTICA
             function autoLoadROM() {
                 statusEl.textContent = 'Intentando auto-cargar el juego...';
                 fetch('panamajoe.tap')
-                    .then(r => {
-                        if(!r.ok) throw new Error("No encontrado");
-                        return r.blob();
-                    })
+                    .then(r => { if(!r.ok) throw new Error("No encontrado"); return r.blob(); })
                     .then(blob => {
                         const file = new File([blob], "panamajoe.tap");
                         forceLoadFile(file);
@@ -175,21 +161,18 @@
                     });
             }
 
-            // 2. CARGA MANUAL (blindada contra errores)
             manualLoadInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
                 if (!file) return;
-                
                 statusEl.textContent = 'Iniciando ' + file.name + '...';
                 forceLoadFile(file);
-                statusEl.textContent = '¡Cinta cargando! ESPERA 2 MINUTOS A QUE SE LLENE LA MEMORIA.';
+                statusEl.textContent = '¡Cinta cargando! ESPERA 2 MINUTOS.';
             });
 
             setTimeout(autoLoadROM, 1000);
 
-            // SISTEMA DE INYECCIÓN DE TECLAS (CORREGIDO)
-            // Los controles reales de Panama Joe en ZX Spectrum son:
-            // 6 = Izquierda, 7 = Derecha, 8 = Abajo, 9 = Arriba, 0 = Salto
+            // === SISTEMA DE TECLADO CORREGIDO ===
+            // Controles del Spectrum: 6=Izq, 7=Der, 8=Abajo, 9=Arriba, 0=Salto
             const keyMap = { 
                 '1':'1', '2':'2', '3':'3', '4':'4', '5':'5', 
                 '6':'6', '7':'7', '8':'8', '9':'9', '0':'0',
@@ -197,16 +180,22 @@
             };
 
             function sendKey(key, isDown) {
-                // El evento debe ir al document para que JSSpeccy 3 lo capture
-                const target = document;
-                
+                const canvas = getCanvas();
+                if (!canvas) {
+                    console.warn('Canvas no encontrado');
+                    return;
+                }
+
+                // Dar foco al canvas antes de enviar la tecla
+                canvas.focus();
+
                 const actualKey = keyMap[key] || key;
-                
                 let keyCode = actualKey.charCodeAt(0);
                 if (key === 'Enter') keyCode = 13;
-                
+                if (key === 'Space') keyCode = 32;
+
                 const eventType = isDown ? 'keydown' : 'keyup';
-                
+
                 const event = new KeyboardEvent(eventType, {
                     key: actualKey,
                     code: 'Digit' + actualKey,
@@ -215,36 +204,42 @@
                     bubbles: true,
                     cancelable: true
                 });
-                
-                // Forzar keyCode y which (necesario en algunos navegadores)
-                Object.defineProperty(event, 'keyCode', {get: () => keyCode});
-                Object.defineProperty(event, 'which', {get: () => keyCode});
-                
-                target.dispatchEvent(event);
+
+                Object.defineProperty(event, 'keyCode', { get: () => keyCode });
+                Object.defineProperty(event, 'which', { get: () => keyCode });
+
+                // Enviar al canvas (bubbles up to document/window si es necesario)
+                canvas.dispatchEvent(event);
+
+                // Debug visual
+                statusEl.textContent = '▶ Tecla ' + actualKey + (isDown ? ' ▼' : ' ▲');
             }
 
             document.querySelectorAll('.btn').forEach(btn => {
                 const key = btn.getAttribute('data-key');
-                
+
+                // touchstart con passive: false para poder preventDefault
                 btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); 
+                    e.preventDefault();
+                    e.stopPropagation();
                     btn.classList.add('active');
                     sendKey(key, true);
-                });
-                
+                }, { passive: false });
+
                 btn.addEventListener('touchend', (e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     btn.classList.remove('active');
                     sendKey(key, false);
-                });
-                
+                }, { passive: false });
+
                 btn.addEventListener('touchcancel', (e) => {
                     e.preventDefault();
                     btn.classList.remove('active');
                     sendKey(key, false);
-                });
+                }, { passive: false });
 
-                // Soporte para ratón (por si pruebas en PC)
+                // Soporte ratón (útil para probar en PC)
                 btn.addEventListener('mousedown', (e) => {
                     e.preventDefault();
                     btn.classList.add('active');
@@ -255,9 +250,8 @@
                     btn.classList.remove('active');
                     sendKey(key, false);
                 });
-                btn.addEventListener('mouseleave', (e) => {
+                btn.addEventListener('mouseleave', () => {
                     btn.classList.remove('active');
-                    sendKey(key, false);
                 });
             });
 
