@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico JSSpeccy</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; padding: 10px; font-size: 14px; }
+        h1 { color: #f0c040; font-size: 1.2em; }
+        pre { background: #111; padding: 10px; border: 1px solid #333; white-space: pre-wrap; word-break: break-all; }
+        .ok { color: #0f0; }
+        .warn { color: #ff0; }
+        .err { color: #f00; }
+        #jsspeccy { width: 100px; height: 100px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico JSSpeccy 3</h1>
+    <div id="jsspeccy"></div>
+
+    <h2>Métodos detectados:</h2>
+    <pre id="output">Cargando emulador...</pre>
+
+    <script src="jsspeccy/jsspeccy.js"></script>
+    <script>
+        const out = document.getElementById('output');
+        let text = '';
+
+        function log(msg, cls) {
+            text += msg + '\n';
+            out.textContent = text;
+            out.className = cls || '';
+        }
+
+        setTimeout(function() {
+            try {
+                log('=== INICIANDO DIAGNÓSTICO ===\n');
+                log('typeof JSSpeccy: ' + typeof JSSpeccy);
+
+                const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
+                    autoStart: true,
+                    sandbox: false,
+                    machine: 48
+                });
+
+                log('speccy typeof: ' + typeof speccy);
+                log('speccy === undefined: ' + (speccy === undefined));
+                log('speccy === null: ' + (speccy === null));
+
+                if (!speccy) {
+                    log('❌ El objeto speccy no se creó', 'err');
+                    return;
+                }
+
+                log('\n=== PROPIEDADES PROPIAS (Object.getOwnPropertyNames) ===');
+                const own = Object.getOwnPropertyNames(speccy);
+                own.forEach(function(k) {
+                    const t = typeof speccy[k];
+                    log('  • ' + k + ' : ' + t + (t === 'function' ? ' ⚙️' : ''));
+                });
+
+                log('\n=== MÉTODOS EN PROTOTIPO ===');
+                const proto = Object.getOwnPropertyNames(Object.getPrototypeOf(speccy));
+                proto.forEach(function(k) {
+                    const t = typeof speccy[k];
+                    log('  • ' + k + ' : ' + t + (t === 'function' ? ' ⚙️' : ''));
+                });
+
+                log('\n=== MÉTODOS EN CADENA DE PROTOTIPOS ===');
+                let proto2 = Object.getPrototypeOf(Object.getPrototypeOf(speccy));
+                if (proto2 && proto2 !== Object.prototype) {
+                    Object.getOwnPropertyNames(proto2).forEach(function(k) {
+                        const t = typeof speccy[k];
+                        log('  • ' + k + ' : ' + t);
+                    });
+                } else {
+                    log('  (no hay más prototipos)');
+                }
+
+                log('\n=== PROPIEDADES DE INTERÉS ===');
+                log('speccy.tape: ' + typeof speccy.tape);
+                log('speccy.cassette: ' + typeof speccy.cassette);
+                log('speccy.tapeFile: ' + typeof speccy.tapeFile);
+                log('speccy.machine: ' + typeof speccy.machine);
+                log('speccy.keyboard: ' + typeof speccy.keyboard);
+                log('speccy.ui: ' + typeof speccy.ui);
+                log('speccy.options: ' + typeof speccy.options);
+
+                log('\n=== FIN DEL DIAGNÓSTICO ===', 'ok');
+                log('📸 Haz captura de pantalla y envía.', 'warn');
+
+            } catch (err) {
+                log('❌ ERROR: ' + err.message, 'err');
+                log('Stack: ' + err.stack, 'err');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
