@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panama Joe - ZX Spectrum</title>
+    <title>ZX Spectrum - Juegos</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -15,9 +15,21 @@
         #game-header h1 { font-size: 1.1em; color: #f0c040; margin: 0; }
         #status { font-size: 0.75em; color: #aaa; margin: 5px 0; min-height: 1.2em; padding: 0 5px; }
 
+        .game-selector {
+            display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;
+            padding: 6px 5px; background: #0a0a14;
+        }
+        .game-btn {
+            background: #222; border: 2px solid #555; color: #ccc;
+            padding: 8px 14px; border-radius: 6px; font-size: 0.85em;
+            cursor: pointer; user-select: none; font-weight: bold;
+        }
+        .game-btn.active { background: #f0c040; color: #000; border-color: #f0c040; }
+        .game-btn:active { background: #a08020; }
+
         .upload-btn {
             display: inline-block; background: #333; border: 1px solid #f0c040;
-            padding: 6px 15px; border-radius: 5px; font-size: 0.85em; color: #f0c040; margin: 3px;
+            padding: 6px 15px; border-radius: 5px; font-size: 0.8em; color: #f0c040; margin: 3px;
             cursor: pointer; user-select: none;
         }
         .upload-btn:active { background: #f0c040; color: #000; }
@@ -59,9 +71,15 @@
 <body>
 
     <div id="game-header">
-        <h1>Panama Joe</h1>
+        <h1 id="game-title">Panama Joe</h1>
         <div id="status">Iniciando emulador...</div>
-        <label for="manual-load" class="upload-btn">📂 Cargar ROM manual (.tap)</label>
+    </div>
+
+    <!-- SELECTOR DE JUEGOS -->
+    <div class="game-selector">
+        <div class="game-btn active" data-game="panamajoe" data-name="Panama Joe">🎮 Panama Joe</div>
+        <div class="game-btn" data-game="pssst" data-name="Pssst">🐛 Pssst</div>
+        <label for="manual-load" class="upload-btn">📂 ROM manual</label>
         <span id="btn-retry" class="upload-btn">▶ Reintentar LOAD ""</span>
         <input type="file" id="manual-load" accept=".tap">
     </div>
@@ -97,7 +115,9 @@
             const statusEl = document.getElementById('status');
             const manualLoadInput = document.getElementById('manual-load');
             const btnRetry = document.getElementById('btn-retry');
+            const gameTitle = document.getElementById('game-title');
 
+            let currentGame = 'panamajoe';
             let tapeLoaded = false;
             let typing = false;
 
@@ -130,12 +150,9 @@
                     const dropEvent = new DragEvent('drop', {
                         bubbles: true, cancelable: true, dataTransfer: dt
                     });
-                    const container = document.getElementById('jsspeccy');
-                    container.dispatchEvent(dropEvent);
+                    document.getElementById('jsspeccy').dispatchEvent(dropEvent);
                     const canvas = getCanvas();
                     if (canvas) canvas.dispatchEvent(dropEvent);
-
-                    // Esperar al evento también en document (por si el emulador lo escucha ahí)
                     document.dispatchEvent(dropEvent);
 
                     tapeLoaded = true;
@@ -167,7 +184,6 @@
                 Object.defineProperty(up, 'keyCode', { get: () => keyCode });
                 Object.defineProperty(up, 'which', { get: () => keyCode });
 
-                // Enviar al canvas Y a document por si acaso
                 canvas.dispatchEvent(down);
                 document.dispatchEvent(down);
                 setTimeout(() => {
@@ -176,12 +192,9 @@
                 }, 60);
             }
 
-            // Presiona Symbol Shift + tecla
             async function pressSymbolShift(letter, code, keyCode) {
                 const canvas = getCanvas();
                 if (!canvas) return;
-
-                // Symbol Shift DOWN (mapeado a Control en JSSpeccy 3)
                 const ssDown = new KeyboardEvent('keydown', {
                     key: 'Control', code: 'ControlLeft', keyCode: 17, which: 17,
                     ctrlKey: true, bubbles: true, cancelable: true
@@ -192,11 +205,9 @@
                 document.dispatchEvent(ssDown);
                 await sleep(120);
 
-                // Tecla normal
                 pressKey(letter, code, keyCode, { ctrlKey: true });
                 await sleep(150);
 
-                // Symbol Shift UP
                 const ssUp = new KeyboardEvent('keyup', {
                     key: 'Control', code: 'ControlLeft', keyCode: 17, which: 17,
                     ctrlKey: false, bubbles: true, cancelable: true
@@ -208,7 +219,6 @@
                 await sleep(120);
             }
 
-            // Escribe LOAD "" y Enter
             async function typeLoadCommand() {
                 if (typing) return;
                 typing = true;
@@ -219,60 +229,82 @@
                 canvas.focus();
                 await sleep(500);
 
-                // Enter primero, para asegurar línea limpia
                 pressKey('Enter', 'Enter', 13);
                 await sleep(400);
-
-                // J → el BASIC lo convierte en "LOAD "
                 pressKey('j', 'KeyJ', 74);
                 await sleep(400);
-
-                // Symbol Shift + P → comilla
                 await pressSymbolShift('p', 'KeyP', 80);
                 await sleep(300);
-
-                // Symbol Shift + P → comilla
                 await pressSymbolShift('p', 'KeyP', 80);
                 await sleep(300);
-
-                // Enter para ejecutar
                 pressKey('Enter', 'Enter', 13);
 
-                setStatus('▶ LOAD "" enviado. Si no arranca en 10 seg, prueba el botón "Reintentar LOAD"".');
+                setStatus('▶ LOAD "" enviado. Espera a que cargue...');
                 typing = false;
             }
 
             // ============================================================
-            // AUTO-CARGA
+            // CARGA DE UN JUEGO (con reset previo)
             // ============================================================
-            async function autoLoad() {
-                setStatus('Descargando panamajoe.tap...');
+            async function loadGame(gameFile) {
+                // 1. Resetear el emulador para limpiar memoria
+                if (typeof speccy.reset === 'function') {
+                    try {
+                        speccy.reset();
+                        console.log('[RESET] Emulador reseteado');
+                    } catch(e) { console.warn('[RESET]', e); }
+                }
+                tapeLoaded = false;
+                await sleep(1500);
+
+                // 2. Descargar el .tap
+                setStatus('Descargando ' + gameFile + '.tap...');
                 try {
-                    const r = await fetch('panamajoe.tap?t=' + Date.now());
+                    const r = await fetch(gameFile + '.tap?t=' + Date.now());
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     const blob = await r.blob();
-                    await loadTape(blob, 'panamajoe.tap');
-                    // Esperar 2 segundos a que el emulador registre la cinta
+                    await loadTape(blob, gameFile + '.tap');
                     await sleep(2000);
                     await typeLoadCommand();
                 } catch (err) {
                     console.error('[FETCH]', err);
-                    setStatus('❌ Auto-carga fallida. Usa "Cargar ROM manual".');
+                    setStatus('❌ Error cargando ' + gameFile + '.tap: ' + err.message);
                 }
             }
 
-            // Iniciar cuando el canvas esté listo
+            // ============================================================
+            // SELECTOR DE JUEGOS
+            // ============================================================
+            document.querySelectorAll('.game-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (typing) return;
+                    const gameId = btn.getAttribute('data-game');
+                    const gameName = btn.getAttribute('data-name');
+                    if (gameId === currentGame) return;
+
+                    // Actualizar UI
+                    document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentGame = gameId;
+                    gameTitle.textContent = gameName;
+
+                    // Cargar el nuevo juego
+                    loadGame(gameId);
+                });
+            });
+
+            // Arrancar con el primer juego
             let tries = 0;
             const interval = setInterval(() => {
                 tries++;
                 if (getCanvas()) {
                     clearInterval(interval);
                     console.log('[OK] Canvas listo tras ' + tries + ' intentos');
-                    setTimeout(autoLoad, 800);
+                    setTimeout(() => loadGame(currentGame), 800);
                 }
                 if (tries > 50) {
                     clearInterval(interval);
-                    setStatus('⚠️ Canvas no detectado tras 10 segundos.');
+                    setStatus('⚠️ Canvas no detectado.');
                 }
             }, 200);
 
