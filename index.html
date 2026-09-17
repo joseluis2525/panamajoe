@@ -62,7 +62,6 @@
         <h1>Panama Joe</h1>
         <div id="status">Iniciando emulador...</div>
         <label for="manual-load" class="upload-btn">📂 Cargar ROM manual (.tap)</label>
-        <span id="btn-force-load" class="upload-btn">▶ Escribir LOAD ""</span>
         <input type="file" id="manual-load" accept=".tap">
     </div>
 
@@ -96,203 +95,64 @@
         document.addEventListener('DOMContentLoaded', () => {
             const statusEl = document.getElementById('status');
             const manualLoadInput = document.getElementById('manual-load');
-            const btnForceLoad = document.getElementById('btn-force-load');
-
-            let canvasEl = null;
-            let tapeLoaded = false;
-            let typing = false;
 
             function setStatus(msg) {
                 statusEl.textContent = msg;
                 console.log('[STATUS]', msg);
             }
 
-            let speccy;
-            try {
-                speccy = JSSpeccy(document.getElementById('jsspeccy'), {
-                    autoStart: true,
-                    sandbox: false,
-                    machine: 48,
-                    zoom: 1
-                });
-                setStatus('Emulador iniciado.');
-                // Debug: ver qué métodos expone el emulador
-                console.log('[METHODS]', Object.getOwnPropertyNames(Object.getPrototypeOf(speccy)));
-            } catch (err) {
-                setStatus('❌ Error: ' + err.message);
-                return;
-            }
+            // Crear el emulador con autoLoadTapes para que cargue la cinta automáticamente
+            const speccy = JSSpeccy(document.getElementById('jsspeccy'), {
+                autoStart: true,
+                autoLoadTapes: true,   // CLAVE: carga automática de la cinta
+                sandbox: false,
+                machine: 48,
+                zoom: 1
+            });
 
-            function getCanvas() {
-                if (!canvasEl) {
-                    canvasEl = document.querySelector('#jsspeccy canvas');
-                    if (canvasEl) {
-                        if (!canvasEl.hasAttribute('tabindex')) canvasEl.setAttribute('tabindex', '0');
-                        canvasEl.addEventListener('click', () => canvasEl.focus());
-                        canvasEl.addEventListener('touchstart', () => canvasEl.focus(), { passive: true });
-                    }
-                }
-                return canvasEl;
-            }
-            const canvasCheck = setInterval(() => { if (getCanvas()) clearInterval(canvasCheck); }, 200);
-
-            // ==================== TAPEO DE TECLAS ====================
-            // Envía un keydown + keyup al canvas con la tecla y código correctos
-            function rawKey(key, code, keyCode, target) {
-                return new Promise(resolve => {
-                    const t = target || getCanvas();
-                    if (!t) return resolve();
-                    const down = new KeyboardEvent('keydown', {
-                        key: key, code: code, keyCode: keyCode, which: keyCode,
-                        bubbles: true, cancelable: true
+            // 1. ESPERAR A QUE EL EMULADOR ESTÉ LISTO
+            speccy.onReady(() => {
+                setStatus('Emulador listo. Descargando panamajoe.tap...');
+                
+                // 2. DESCARGAR EL ARCHIVO .TAP
+                fetch('panamajoe.tap')
+                    .then(response => {
+                        if (!response.ok) throw new Error('HTTP ' + response.status);
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        console.log('[TAPE] Blob recibido:', blob.size, 'bytes');
+                        
+                        // 3. CREAR UNA URL TEMPORAL PARA EL BLOB
+                        const tapeUrl = URL.createObjectURL(blob);
+                        
+                        // 4. CARGAR LA CINTA USANDO openUrl
+                        // Con autoLoadTapes: true, el emulador debería encargarse del resto.
+                        speccy.openUrl(tapeUrl);
+                        
+                        setStatus('✅ Cinta insertada. Esperando a que el juego cargue...');
+                        
+                        // 5. LIBERAR LA URL TEMPORAL (buena práctica)
+                        // Un pequeño retraso para asegurar que el emulador ha leído la URL.
+                        setTimeout(() => URL.revokeObjectURL(tapeUrl), 5000);
+                    })
+                    .catch(err => {
+                        console.error('[FETCH ERROR]', err);
+                        setStatus('❌ Error al descargar el .tap. Usa "Cargar ROM manual".');
                     });
-                    const up = new KeyboardEvent('keyup', {
-                        key: key, code: code, keyCode: keyCode, which: keyCode,
-                        bubbles: true, cancelable: true
-                    });
-                    Object.defineProperty(down, 'keyCode', { get: () => keyCode });
-                    Object.defineProperty(down, 'which', { get: () => keyCode });
-                    Object.defineProperty(up, 'keyCode', { get: () => keyCode });
-                    Object.defineProperty(up, 'which', { get: () => keyCode });
-                    t.dispatchEvent(down);
-                    setTimeout(() => {
-                        t.dispatchEvent(up);
-                        setTimeout(resolve, 80);
-                    }, 80);
-                });
-            }
+            });
 
-            // Mantiene Symbol Shift (Control) pulsado mientras se pulsa otra tecla
-            async function rawKeyWithSymbolShift(key, code, keyCode) {
-                const t = getCanvas();
-                if (!t) return;
-
-                // Symbol Shift DOWN (usamos la tecla Control porque JSSpeccy 3 la mapea así)
-                const symDown = new KeyboardEvent('keydown', {
-                    key: 'Control', code: 'ControlLeft', keyCode: 17, which: 17,
-                    ctrlKey: true, bubbles: true, cancelable: true
-                });
-                Object.defineProperty(symDown, 'keyCode', { get: () => 17 });
-                Object.defineProperty(symDown, 'which', { get: () => 17 });
-                t.dispatchEvent(symDown);
-                await new Promise(r => setTimeout(r, 120));
-
-                // Tecla principal
-                await rawKey(key, code, keyCode, t);
-
-                // Symbol Shift UP
-                const symUp = new KeyboardEvent('keyup', {
-                    key: 'Control', code: 'ControlLeft', keyCode: 17, which: 17,
-                    ctrlKey: false, bubbles: true, cancelable: true
-                });
-                Object.defineProperty(symUp, 'keyCode', { get: () => 17 });
-                Object.defineProperty(symUp, 'which', { get: () => 17 });
-                t.dispatchEvent(symUp);
-                await new Promise(r => setTimeout(r, 120));
-            }
-
-            // Escribe LOAD "" con la secuencia correcta del Spectrum
-            async function typeLoadCommand() {
-                if (typing) return;
-                typing = true;
-                setStatus('⌨️ Escribiendo LOAD ""...');
-                const t = getCanvas();
-                if (!t) { typing = false; return; }
-                t.focus();
-
-                // Dar tiempo al navegador a procesar el foco
-                await new Promise(r => setTimeout(r, 500));
-
-                // L - O - A - D  (en el Spectrum, la L en modo K escribe "LET ", así que
-                // es más seguro escribir letra por letra y luego borrar lo que sobre)
-                await rawKey('l', 'KeyL', 76, t);
-                await rawKey('o', 'KeyO', 79, t);
-                await rawKey('a', 'KeyA', 65, t);
-                await rawKey('d', 'KeyD', 68, t);
-                await rawKey(' ', 'Space', 32, t);
-
-                // " (comillas) = Symbol Shift + P
-                await rawKeyWithSymbolShift('p', 'KeyP', 80);
-                await rawKeyWithSymbolShift('p', 'KeyP', 80);
-
-                // Enter
-                await rawKey('Enter', 'Enter', 13, t);
-
-                setStatus('▶ LOAD "" enviado. El juego debería empezar a cargar en unos segundos.');
-                typing = false;
-            }
-
-            // ==================== CARGA DE CINTA ====================
-            async function loadTapeFromBlob(blob, filename) {
-                console.log('[TAPE] Blob recibido:', filename, blob.size, 'bytes');
-                try {
-                    // Método 1: Si existe un método de autoload, usarlo
-                    if (typeof speccy.autoload === 'function') {
-                        const bytes = new Uint8Array(await blob.arrayBuffer());
-                        speccy.autoload(bytes);
-                        tapeLoaded = true;
-                        setStatus('✅ Cinta insertada (autoload)');
-                        return;
-                    }
-                    // Método 2: Drag & drop simulado (el que ya funcionaba)
-                    const file = new File([blob], filename);
-                    const dt = new DataTransfer();
-                    dt.items.add(file);
-                    const dropEvent = new DragEvent('drop', {
-                        bubbles: true, cancelable: true, dataTransfer: dt
-                    });
-                    const container = document.getElementById('jsspeccy');
-                    container.dispatchEvent(dropEvent);
-                    const canvas = getCanvas();
-                    if (canvas) canvas.dispatchEvent(dropEvent);
-                    tapeLoaded = true;
-                    setStatus('✅ Cinta insertada: ' + filename);
-                } catch (err) {
-                    console.error('[TAPE ERROR]', err);
-                    setStatus('❌ Error al insertar cinta: ' + err.message);
-                }
-            }
-
-            // Auto-carga
-            async function autoLoadROM() {
-                setStatus('Descargando panamajoe.tap...');
-                try {
-                    const r = await fetch('panamajoe.tap');
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                    const blob = await r.blob();
-                    await loadTapeFromBlob(blob, 'panamajoe.tap');
-                    // Esperar 2 segundos a que el emulador procese la cinta
-                    setTimeout(typeLoadCommand, 2000);
-                } catch (err) {
-                    console.error('[FETCH]', err);
-                    setStatus('❌ Auto-carga fallida. Usa "Cargar ROM manual".');
-                }
-            }
-
-            // Carga manual
-            manualLoadInput.addEventListener('change', async function(event) {
+            // --- Carga manual (el resto del código se mantiene) ---
+            manualLoadInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
                 if (!file) return;
                 setStatus('Insertando: ' + file.name);
-                await loadTapeFromBlob(file, file.name);
-                setTimeout(typeLoadCommand, 2000);
+                const tapeUrl = URL.createObjectURL(file);
+                speccy.openUrl(tapeUrl);
+                setTimeout(() => URL.revokeObjectURL(tapeUrl), 5000);
             });
 
-            // Botón "Escribir LOAD """ - solo re-teclea, no re-carga
-            btnForceLoad.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (tapeLoaded) {
-                    typeLoadCommand();
-                } else {
-                    setStatus('No hay cinta insertada aún. Espera o usa carga manual.');
-                }
-            });
-
-            // Iniciar auto-carga
-            setTimeout(autoLoadROM, 2000);
-
-            // ==================== GAMEPAD ====================
+            // --- Teclado para el gamepad ---
             const keyMap = {
                 '1':'1', '2':'2', '3':'3', '4':'4', '5':'5',
                 '6':'6', '7':'7', '8':'8', '9':'9', '0':'0',
@@ -300,7 +160,7 @@
             };
 
             function sendGamepadKey(key, isDown) {
-                const canvas = getCanvas();
+                const canvas = document.querySelector('#jsspeccy canvas');
                 if (!canvas) return;
                 canvas.focus();
                 const actualKey = keyMap[key] || key;
@@ -322,7 +182,6 @@
                 const key = btn.getAttribute('data-key');
                 let touchHandled = false;
 
-                // Touch
                 btn.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     touchHandled = true;
@@ -340,8 +199,6 @@
                     btn.classList.remove('active');
                     sendGamepadKey(key, false);
                 }, { passive: false });
-
-                // Ratón (solo si no fue touch)
                 btn.addEventListener('mousedown', (e) => {
                     if (touchHandled) return;
                     e.preventDefault();
